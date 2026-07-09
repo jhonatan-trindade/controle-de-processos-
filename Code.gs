@@ -9,9 +9,33 @@
  */
 
 var NOME_ABA = 'Processos';
-var CABECALHOS = ['Processo', 'Descrição', 'Status', 'Data de mudança de Status', 'Prazo', 'Obs'];
+
+// Cabeçalhos na ordem usada ao semear uma planilha nova. Planilhas antigas são
+// migradas por nome de coluna (ver obterMapaColunas_), ganhando as colunas que
+// faltarem — nenhum dado existente é perdido.
+var CABECALHOS = [
+  'Processo', 'Link', 'Descrição', 'Status',
+  'Data de mudança de Status', 'Prazo', 'Links relacionados', 'Obs', 'Arquivado'
+];
+
+// Mapa campo (cliente) -> nome do cabeçalho (planilha).
+var COL = {
+  processo: 'Processo',
+  link: 'Link',
+  descricao: 'Descrição',
+  status: 'Status',
+  dataStatus: 'Data de mudança de Status',
+  prazo: 'Prazo',
+  linksRelacionados: 'Links relacionados',
+  obs: 'Obs',
+  arquivado: 'Arquivado'
+};
+
+// Colunas que guardam datas (formato dd/mm/yyyy).
+var COLS_DATA = ['Data de mudança de Status', 'Prazo'];
 
 // Dados importados da planilha Controle_de_Processos.xlsx (aba "Tabela").
+// Estrutura: [processo, descrição, status, dataStatus, prazo, obs].
 // Datas no formato yyyy-MM-dd; "-" indica campo sem valor.
 var DADOS_INICIAIS = [
   ['1400.01.0031537/2026-36', 'Of 344/206-LIGABOM Solic.para participação de militares integrantes da Câm.Técnica do Projeto RESPAD', 'Em Andamento', '2026-07-08', '2026-07-09', 'Email enviado para a LIGABOM, Ofício assinado pela CG. Enviar email resposta Maj Lucas Pacheco'],
@@ -66,22 +90,53 @@ function obterAba_() {
   return aba;
 }
 
+/**
+ * Mapa nome-do-cabeçalho -> índice da coluna (1-based). Garante que toda coluna
+ * de CABECALHOS exista, criando as que faltarem ao final (migração segura de
+ * planilhas antigas, sem perder dados já gravados).
+ */
+function obterMapaColunas_(aba) {
+  var ultCol = Math.max(aba.getLastColumn(), 1);
+  var cabec = aba.getRange(1, 1, 1, ultCol).getValues()[0];
+  var mapa = {};
+  cabec.forEach(function (nome, i) {
+    var n = String(nome).trim();
+    if (n) mapa[n] = i + 1;
+  });
+  CABECALHOS.forEach(function (nome) {
+    if (!mapa[nome]) {
+      ultCol++;
+      aba.getRange(1, ultCol).setValue(nome).setFontWeight('bold');
+      mapa[nome] = ultCol;
+    }
+  });
+  return mapa;
+}
+
 function semearDados_(aba) {
   aba.getRange(1, 1, 1, CABECALHOS.length).setValues([CABECALHOS]).setFontWeight('bold');
   aba.setFrozenRows(1);
   if (DADOS_INICIAIS.length) {
     var linhas = DADOS_INICIAIS.map(function (r) {
-      return [r[0], r[1], r[2], paraCelula_(r[3]), paraCelula_(r[4]), r[5]];
+      // [processo, link, descrição, status, dataStatus, prazo, linksRel, obs, arquivado]
+      return [r[0], '', r[1], r[2], paraCelula_(r[3]), paraCelula_(r[4]), '', r[5], false];
     });
     aba.getRange(2, 1, linhas.length, CABECALHOS.length).setValues(linhas);
   }
-  aba.getRange(2, 4, Math.max(DADOS_INICIAIS.length, 1000), 2).setNumberFormat('dd/mm/yyyy');
-  aba.setColumnWidth(1, 190);
-  aba.setColumnWidth(2, 420);
-  aba.setColumnWidth(3, 120);
-  aba.setColumnWidth(4, 120);
-  aba.setColumnWidth(5, 100);
-  aba.setColumnWidth(6, 420);
+  var mapa = {};
+  CABECALHOS.forEach(function (n, i) { mapa[n] = i + 1; });
+  COLS_DATA.forEach(function (n) {
+    aba.getRange(2, mapa[n], Math.max(DADOS_INICIAIS.length, 1000), 1).setNumberFormat('dd/mm/yyyy');
+  });
+  aba.setColumnWidth(mapa['Processo'], 190);
+  aba.setColumnWidth(mapa['Link'], 120);
+  aba.setColumnWidth(mapa['Descrição'], 420);
+  aba.setColumnWidth(mapa['Status'], 120);
+  aba.setColumnWidth(mapa['Data de mudança de Status'], 120);
+  aba.setColumnWidth(mapa['Prazo'], 100);
+  aba.setColumnWidth(mapa['Links relacionados'], 240);
+  aba.setColumnWidth(mapa['Obs'], 420);
+  aba.setColumnWidth(mapa['Arquivado'], 90);
 }
 
 /** 'yyyy-MM-dd' -> Date (para gravar na célula); qualquer outro valor vira texto. */
@@ -101,24 +156,36 @@ function deCelula_(v) {
   return v === null || v === undefined ? '' : String(v);
 }
 
+/** Interpreta o valor da coluna "Arquivado" como booleano. */
+function ehVerdadeiro_(v) {
+  if (v === true) return true;
+  var s = String(v).trim().toLowerCase();
+  return s === 'true' || s === 'sim' || s === 'verdadeiro' || s === '1';
+}
+
 /** Lê todos os processos. Chamado pelo cliente. */
 function obterProcessos() {
   var aba = obterAba_();
+  var mapa = obterMapaColunas_(aba);
+  var ultCol = aba.getLastColumn();
   var ultima = aba.getLastRow();
   var processos = [];
   if (ultima >= 2) {
-    var valores = aba.getRange(2, 1, ultima - 1, CABECALHOS.length).getValues();
+    var valores = aba.getRange(2, 1, ultima - 1, ultCol).getValues();
     valores.forEach(function (r, i) {
       var vazio = r.every(function (c) { return c === '' || c === null; });
       if (vazio) return;
       processos.push({
         linha: i + 2,
-        processo: deCelula_(r[0]),
-        descricao: deCelula_(r[1]),
-        status: deCelula_(r[2]),
-        dataStatus: deCelula_(r[3]),
-        prazo: deCelula_(r[4]),
-        obs: deCelula_(r[5])
+        processo: deCelula_(r[mapa[COL.processo] - 1]),
+        link: deCelula_(r[mapa[COL.link] - 1]),
+        descricao: deCelula_(r[mapa[COL.descricao] - 1]),
+        status: deCelula_(r[mapa[COL.status] - 1]),
+        dataStatus: deCelula_(r[mapa[COL.dataStatus] - 1]),
+        prazo: deCelula_(r[mapa[COL.prazo] - 1]),
+        linksRelacionados: deCelula_(r[mapa[COL.linksRelacionados] - 1]),
+        obs: deCelula_(r[mapa[COL.obs] - 1]),
+        arquivado: ehVerdadeiro_(r[mapa[COL.arquivado] - 1])
       });
     });
   }
@@ -130,33 +197,50 @@ function obterProcessos() {
 
 /**
  * Cria (sem p.linha) ou atualiza (com p.linha) um processo.
- * Campos: processo, descricao, status, dataStatus, prazo, obs.
+ * Campos: processo, link, descricao, status, dataStatus, prazo,
+ * linksRelacionados, obs. O estado "arquivado" é preservado na atualização.
  */
 function salvarProcesso(p) {
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     var aba = obterAba_();
-    var valores = [[
-      p.processo || '-',
-      p.descricao || '',
-      p.status || 'Não iniciado',
-      paraCelula_(p.dataStatus || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')),
-      paraCelula_(p.prazo),
-      p.obs || ''
-    ]];
+    var mapa = obterMapaColunas_(aba);
+    var ultCol = aba.getLastColumn();
     var linha = Number(p.linha);
-    if (linha >= 2) {
-      aba.getRange(linha, 1, 1, CABECALHOS.length).setValues(valores);
-    } else {
-      linha = aba.getLastRow() + 1;
-      aba.getRange(linha, 1, 1, CABECALHOS.length).setValues(valores);
-      aba.getRange(linha, 4, 1, 2).setNumberFormat('dd/mm/yyyy');
+    var novo = !(linha >= 2);
+    if (novo) linha = aba.getLastRow() + 1;
+
+    var faixa = aba.getRange(linha, 1, 1, ultCol);
+    var row = novo ? novaLinhaVazia_(ultCol) : faixa.getValues()[0];
+    function set(campo, valor) { row[mapa[COL[campo]] - 1] = valor; }
+
+    set('processo', p.processo || '-');
+    set('link', p.link || '');
+    set('descricao', p.descricao || '');
+    set('status', p.status || 'Não iniciado');
+    set('dataStatus', paraCelula_(p.dataStatus || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')));
+    set('prazo', paraCelula_(p.prazo));
+    set('linksRelacionados', p.linksRelacionados || '');
+    set('obs', p.obs || '');
+    if (novo) set('arquivado', false);
+
+    faixa.setValues([row]);
+    if (novo) {
+      COLS_DATA.forEach(function (n) {
+        aba.getRange(linha, mapa[n], 1, 1).setNumberFormat('dd/mm/yyyy');
+      });
     }
     return obterProcessos();
   } finally {
     lock.releaseLock();
   }
+}
+
+function novaLinhaVazia_(n) {
+  var a = [];
+  for (var i = 0; i < n; i++) a.push('');
+  return a;
 }
 
 /** Troca rápida de status: grava o status e a data de mudança (hoje). */
@@ -165,10 +249,27 @@ function alterarStatus(linha, status) {
   lock.waitLock(10000);
   try {
     var aba = obterAba_();
+    var mapa = obterMapaColunas_(aba);
     linha = Number(linha);
     if (!(linha >= 2)) throw new Error('Linha inválida.');
-    aba.getRange(linha, 3).setValue(status);
-    aba.getRange(linha, 4).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
+    aba.getRange(linha, mapa[COL.status]).setValue(status);
+    aba.getRange(linha, mapa[COL.dataStatus]).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
+    return obterProcessos();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Arquiva (arquivar=true) ou desarquiva (arquivar=false) um processo. */
+function arquivarProcesso(linha, arquivar) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var aba = obterAba_();
+    var mapa = obterMapaColunas_(aba);
+    linha = Number(linha);
+    if (!(linha >= 2)) throw new Error('Linha inválida.');
+    aba.getRange(linha, mapa[COL.arquivado]).setValue(arquivar ? true : false);
     return obterProcessos();
   } finally {
     lock.releaseLock();

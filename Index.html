@@ -100,6 +100,30 @@
   td .obs { color: var(--ink-2); font-size: 13px; }
   .vazio { padding: 40px; text-align: center; color: var(--muted); }
 
+  /* ---------- Links ---------- */
+  a.link-ext { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(57, 135, 229, 0.35); }
+  a.link-ext:hover { border-bottom-color: var(--accent); }
+  td .proc a.link-ext { color: var(--accent); }
+  .links-rel { display: flex; flex-direction: column; gap: 4px; }
+  .links-rel a.link-ext {
+    display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-size: 13px; vertical-align: bottom;
+  }
+  .links-sem { color: var(--muted); }
+
+  /* ---------- Abas (ativos / arquivados) ---------- */
+  .abas { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+  .aba {
+    background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted);
+    padding: 9px 14px; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-bottom: -1px;
+  }
+  .aba:hover { color: var(--ink-2); }
+  .aba.ativa { color: var(--ink); border-bottom-color: var(--accent); }
+  .aba .contador {
+    display: inline-block; margin-left: 6px; background: var(--surface-3); color: var(--ink-2);
+    border-radius: 999px; padding: 1px 7px; font-size: 11.5px;
+  }
+
   /* status como select estilizado de badge */
   select.badge {
     appearance: none; -webkit-appearance: none; border-radius: 999px; font-weight: 600;
@@ -200,6 +224,11 @@
     </div>
   </div>
 
+  <div class="abas" id="abas">
+    <button class="aba ativa" data-aba="ativos">Ativos<span class="contador" id="contAtivos">0</span></button>
+    <button class="aba" data-aba="arquivados">Arquivados<span class="contador" id="contArquivados">0</span></button>
+  </div>
+
   <div class="painel">
     <div class="painel-topo"><span id="contagem"></span></div>
     <div class="rolagem">
@@ -212,6 +241,7 @@
             <th data-col="dataStatus">Mudança de status</th>
             <th data-col="prazo">Prazo</th>
             <th data-col="obs">Obs</th>
+            <th data-col="linksRelacionados">Links relacionados</th>
             <th></th>
           </tr>
         </thead>
@@ -234,8 +264,12 @@
         </div>
         <div class="campo">
           <label for="cStatus">Status</label>
-          <input id="cStatus" list="listaStatus" required placeholder="Em Andamento">
-          <datalist id="listaStatus"></datalist>
+          <select id="cStatus" required></select>
+        </div>
+        <div class="campo largura-total">
+          <label for="cLink">Link do processo (SEI)</label>
+          <input id="cLink" placeholder="https://sei.mg.gov.br/...">
+          <span class="dica">Cole o endereço do SEI. O nº do processo vira um link clicável.</span>
         </div>
         <div class="campo largura-total">
           <label for="cDescricao">Descrição</label>
@@ -252,11 +286,18 @@
           <span class="dica">Deixe vazio se não houver prazo.</span>
         </div>
         <div class="campo largura-total">
+          <label for="cLinksRelacionados">Links relacionados</label>
+          <textarea id="cLinksRelacionados" placeholder="https://exemplo.com&#10;Rótulo | https://outro.com"></textarea>
+          <span class="dica">Um link por linha. Opcional: "Rótulo | https://endereço".</span>
+        </div>
+        <div class="campo largura-total">
           <label for="cObs">Observações</label>
           <textarea id="cObs"></textarea>
         </div>
       </div>
       <div class="rodape">
+        <button type="button" class="btn perigo" id="btnExcluirForm" style="margin-right:auto;display:none">Excluir</button>
+        <button type="button" class="btn" id="btnArquivarForm" style="display:none">Arquivar</button>
         <button type="button" class="btn" id="btnCancelar">Cancelar</button>
         <button type="submit" class="btn primario" id="btnSalvar">Salvar</button>
       </div>
@@ -270,6 +311,7 @@
     <h2>Excluir processo</h2>
     <p id="textoConfirmar"></p>
     <div class="rodape">
+      <button type="button" class="btn" id="btnVoltarEdicao">Voltar à edição</button>
       <button type="button" class="btn" id="btnConfirmarNao">Cancelar</button>
       <button type="button" class="btn perigo" id="btnConfirmarSim">Excluir</button>
     </div>
@@ -284,7 +326,9 @@
   var urlPlanilha = '';
   var ordenacao = { col: 'dataStatus', dir: 'desc' };
   var linhaParaExcluir = null;
+  var abaAtual = 'ativos';
   var DIAS_ALERTA_PRAZO = 2;
+  var STATUS_PADRAO = ['Em Andamento', 'Concluído', 'Consulta', 'Não iniciado'];
 
   // Paleta de status (cores validadas para superfície escura)
   var CORES_STATUS = {
@@ -332,9 +376,53 @@
   }
 
   function statusConhecidos() {
-    var lista = Object.keys(CORES_STATUS);
+    var lista = STATUS_PADRAO.slice();
+    Object.keys(CORES_STATUS).forEach(function (s) { if (lista.indexOf(s) === -1) lista.push(s); });
     dados.forEach(function (p) { if (p.status && lista.indexOf(p.status) === -1) lista.push(p.status); });
     return lista;
+  }
+
+  // ---------- Links ----------
+  function ehUrl(s) { return /^(https?:\/\/|www\.)\S+$/i.test(String(s == null ? '' : s).trim()); }
+
+  function normalizarUrl(s) {
+    s = String(s == null ? '' : s).trim();
+    return /^www\./i.test(s) ? 'https://' + s : s;
+  }
+
+  function rotuloUrl(url) {
+    var m = String(url).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+    return m.length > 40 ? m.slice(0, 39) + '…' : m;
+  }
+
+  function ancora(url, texto) {
+    return '<a class="link-ext" href="' + escapar(normalizarUrl(url)) + '" target="_blank" rel="noopener" title="' +
+      escapar(normalizarUrl(url)) + '">' + escapar(texto) + '</a>';
+  }
+
+  function celulaProcesso(p) {
+    var texto = p.processo || '-';
+    var url = ehUrl(p.link) ? p.link : (ehUrl(p.processo) ? p.processo : '');
+    if (url) return '<span class="proc">' + ancora(url, texto) + '</span>';
+    return '<span class="proc">' + escapar(texto) + '</span>';
+  }
+
+  function celulaLinks(p) {
+    var bruto = (p.linksRelacionados || '').trim();
+    if (!bruto) return '<span class="links-sem">—</span>';
+    var itens = bruto.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+    var html = itens.map(function (linha) {
+      var rotulo = linha, url = linha;
+      var barra = linha.indexOf('|');
+      if (barra !== -1) {
+        rotulo = linha.slice(0, barra).trim();
+        url = linha.slice(barra + 1).trim();
+      }
+      if (!ehUrl(url)) return '<span class="obs">' + escapar(linha) + '</span>';
+      if (!rotulo || rotulo === url) rotulo = rotuloUrl(url);
+      return ancora(url, rotulo);
+    }).join('');
+    return '<div class="links-rel">' + html + '</div>';
   }
 
   // ---------- Chamadas ao servidor ----------
@@ -375,12 +463,18 @@
     t._timer = setTimeout(function () { t.className = ''; }, erro ? 6000 : 3000);
   }
 
-  // ---------- Filtros ----------
+  // ---------- Abas / filtros ----------
+  function dadosDaAba() {
+    return dados.filter(function (p) {
+      return abaAtual === 'arquivados' ? p.arquivado : !p.arquivado;
+    });
+  }
+
   function filtrados() {
     var busca = $('fBusca').value.trim().toLowerCase();
     var status = $('fStatus').value;
     var de = $('fDe').value, ate = $('fAte').value;
-    return dados.filter(function (p) {
+    return dadosDaAba().filter(function (p) {
       if (status && p.status !== status) return false;
       if (de && (!ehData(p.dataStatus) || p.dataStatus < de)) return false;
       if (ate && (!ehData(p.dataStatus) || p.dataStatus > ate)) return false;
@@ -395,26 +489,41 @@
   function preencherOpcoesStatus() {
     var selecionado = $('fStatus').value;
     var opcoes = '<option value="">Todos</option>';
-    var datalist = '';
+    var opcoesForm = '';
     statusConhecidos().forEach(function (s) {
       opcoes += '<option value="' + escapar(s) + '">' + escapar(s) + '</option>';
-      datalist += '<option value="' + escapar(s) + '">';
+      opcoesForm += '<option value="' + escapar(s) + '">' + escapar(s) + '</option>';
     });
     $('fStatus').innerHTML = opcoes;
     $('fStatus').value = selecionado;
-    $('listaStatus').innerHTML = datalist;
+    var selForm = $('cStatus');
+    var valForm = selForm.value;
+    selForm.innerHTML = opcoesForm;
+    if (valForm) selForm.value = valForm;
   }
 
   // ---------- Renderização ----------
   function renderizar() {
+    atualizarAbas();
     renderizarTiles();
     renderizarTabela();
   }
 
+  function atualizarAbas() {
+    var ativos = 0, arquivados = 0;
+    dados.forEach(function (p) { p.arquivado ? arquivados++ : ativos++; });
+    $('contAtivos').textContent = ativos;
+    $('contArquivados').textContent = arquivados;
+    document.querySelectorAll('.aba').forEach(function (b) {
+      b.classList.toggle('ativa', b.dataset.aba === abaAtual);
+    });
+  }
+
   function renderizarTiles() {
+    var base = dadosDaAba();
     var vencidos = 0, proximos = 0;
     var porStatus = {};
-    dados.forEach(function (p) {
+    base.forEach(function (p) {
       porStatus[p.status] = (porStatus[p.status] || 0) + 1;
       if (p.status === 'Concluído') return;
       var dias = diasAte(p.prazo);
@@ -424,7 +533,7 @@
     });
 
     var filtroAtual = $('fStatus').value;
-    var html = '<div class="tile"><div class="rotulo">Total</div><div class="valor">' + dados.length + '</div></div>';
+    var html = '<div class="tile"><div class="rotulo">Total</div><div class="valor">' + base.length + '</div></div>';
     statusConhecidos().forEach(function (s) {
       if (!porStatus[s]) return;
       var ativo = filtroAtual === s ? ' ativo' : '';
@@ -475,9 +584,11 @@
       return va < vb ? -dir : va > vb ? dir : 0;
     });
 
-    $('contagem').textContent = lista.length === dados.length
-      ? dados.length + ' processos'
-      : lista.length + ' de ' + dados.length + ' processos (filtrado)';
+    var totalAba = dadosDaAba().length;
+    var rotuloAba = abaAtual === 'arquivados' ? ' arquivados' : '';
+    $('contagem').textContent = lista.length === totalAba
+      ? totalAba + ' processos' + rotuloAba
+      : lista.length + ' de ' + totalAba + ' processos' + rotuloAba + ' (filtrado)';
     $('subtitulo').textContent = 'Atualizado em ' + formatarData(hojeIso());
 
     document.querySelectorAll('th[data-col]').forEach(function (th) {
@@ -486,20 +597,28 @@
     });
 
     if (!lista.length) {
-      $('corpoTabela').innerHTML = '<tr><td colspan="7" class="vazio">Nenhum processo encontrado com os filtros atuais.</td></tr>';
+      var vazioMsg = abaAtual === 'arquivados'
+        ? 'Nenhum processo arquivado.'
+        : 'Nenhum processo encontrado com os filtros atuais.';
+      $('corpoTabela').innerHTML = '<tr><td colspan="8" class="vazio">' + vazioMsg + '</td></tr>';
       return;
     }
 
     $('corpoTabela').innerHTML = lista.map(function (p) {
+      var botaoArquivo = p.arquivado
+        ? '<button class="acao" title="Desarquivar" data-desarquivar="' + p.linha + '">📤</button>'
+        : '<button class="acao" title="Arquivar" data-arquivar="' + p.linha + '">📥</button>';
       return '<tr>' +
-        '<td><span class="proc">' + escapar(p.processo) + '</span></td>' +
+        '<td>' + celulaProcesso(p) + '</td>' +
         '<td><span class="desc">' + escapar(p.descricao) + '</span></td>' +
         '<td>' + seletorStatus(p) + '</td>' +
         '<td class="num">' + escapar(formatarData(p.dataStatus)) + '</td>' +
         '<td>' + celulaPrazo(p) + '</td>' +
         '<td><span class="obs">' + escapar(p.obs) + '</span></td>' +
+        '<td>' + celulaLinks(p) + '</td>' +
         '<td style="white-space:nowrap">' +
           '<button class="acao" title="Editar" data-editar="' + p.linha + '">✏️</button>' +
+          botaoArquivo +
           '<button class="acao excluir" title="Excluir" data-excluir="' + p.linha + '">🗑️</button>' +
         '</td></tr>';
     }).join('');
@@ -507,15 +626,30 @@
 
   // ---------- Formulário ----------
   function abrirForm(p) {
+    preencherOpcoesStatus();
     $('tituloForm').textContent = p ? 'Editar processo' : 'Novo processo';
     $('cLinha').value = p ? p.linha : '';
     $('cProcesso').value = p ? p.processo : '';
+    $('cLink').value = p ? (p.link || '') : '';
     $('cDescricao').value = p ? p.descricao : '';
-    $('cStatus').value = p ? p.status : 'Em Andamento';
+    var status = p ? p.status : 'Em Andamento';
+    var sel = $('cStatus'), existe = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === status) { existe = true; break; }
+    }
+    if (status && !existe) sel.add(new Option(status, status));
+    sel.value = status;
     $('cStatus').dataset.original = $('cStatus').value;
     $('cDataStatus').value = p && ehData(p.dataStatus) ? p.dataStatus : hojeIso();
     $('cPrazo').value = p && ehData(p.prazo) ? p.prazo : '';
+    $('cLinksRelacionados').value = p ? (p.linksRelacionados || '') : '';
     $('cObs').value = p ? p.obs : '';
+
+    var edicao = !!p;
+    $('btnExcluirForm').style.display = edicao ? '' : 'none';
+    $('btnArquivarForm').style.display = edicao ? '' : 'none';
+    $('btnArquivarForm').textContent = (p && p.arquivado) ? 'Desarquivar' : 'Arquivar';
+
     $('fundoForm').classList.add('aberto');
     $('cProcesso').focus();
   }
@@ -536,10 +670,12 @@
     var p = {
       linha: $('cLinha').value || null,
       processo: $('cProcesso').value.trim() || '-',
+      link: $('cLink').value.trim(),
       descricao: $('cDescricao').value.trim(),
       status: $('cStatus').value.trim() || 'Não iniciado',
       dataStatus: $('cDataStatus').value,
       prazo: $('cPrazo').value || '-',
+      linksRelacionados: $('cLinksRelacionados').value.trim(),
       obs: $('cObs').value.trim()
     };
     fecharForm();
@@ -571,6 +707,14 @@
     renderizarTabela();
   });
 
+  function pedirExclusao(linha) {
+    var proc = dados.find(function (x) { return x.linha == linha; });
+    linhaParaExcluir = linha;
+    $('textoConfirmar').textContent = 'Tem certeza que deseja excluir "' +
+      (proc ? (proc.processo !== '-' ? proc.processo : proc.descricao) : '') + '"? Essa ação não pode ser desfeita.';
+    $('fundoConfirmar').classList.add('aberto');
+  }
+
   $('corpoTabela').addEventListener('click', function (e) {
     var btnEditar = e.target.closest('[data-editar]');
     if (btnEditar) {
@@ -578,13 +722,19 @@
       if (p) abrirForm(p);
       return;
     }
+    var btnArquivar = e.target.closest('[data-arquivar]');
+    if (btnArquivar) {
+      chamarServidor('arquivarProcesso', [Number(btnArquivar.dataset.arquivar), true], 'Processo arquivado.');
+      return;
+    }
+    var btnDesarquivar = e.target.closest('[data-desarquivar]');
+    if (btnDesarquivar) {
+      chamarServidor('arquivarProcesso', [Number(btnDesarquivar.dataset.desarquivar), false], 'Processo desarquivado.');
+      return;
+    }
     var btnExcluir = e.target.closest('[data-excluir]');
     if (btnExcluir) {
-      var proc = dados.find(function (x) { return x.linha == btnExcluir.dataset.excluir; });
-      linhaParaExcluir = btnExcluir.dataset.excluir;
-      $('textoConfirmar').textContent = 'Tem certeza que deseja excluir "' +
-        (proc ? (proc.processo !== '-' ? proc.processo : proc.descricao) : '') + '"? Essa ação não pode ser desfeita.';
-      $('fundoConfirmar').classList.add('aberto');
+      pedirExclusao(btnExcluir.dataset.excluir);
     }
   });
 
@@ -594,8 +744,42 @@
     chamarServidor('alterarStatus', [Number(sel.dataset.linha), sel.value], 'Status atualizado.');
   });
 
-  $('btnConfirmarNao').addEventListener('click', function () { $('fundoConfirmar').classList.remove('aberto'); });
+  // Abas ativos / arquivados
+  $('abas').addEventListener('click', function (e) {
+    var aba = e.target.closest('.aba');
+    if (!aba) return;
+    abaAtual = aba.dataset.aba;
+    renderizar();
+  });
+
+  // Botões dentro do formulário de edição
+  $('btnArquivarForm').addEventListener('click', function () {
+    var linha = $('cLinha').value;
+    if (!linha) return;
+    var arquivar = this.textContent !== 'Desarquivar';
+    fecharForm();
+    chamarServidor('arquivarProcesso', [Number(linha), arquivar],
+      arquivar ? 'Processo arquivado.' : 'Processo desarquivado.');
+  });
+
+  $('btnExcluirForm').addEventListener('click', function () {
+    var linha = $('cLinha').value;
+    if (!linha) return;
+    fecharForm();
+    pedirExclusao(linha);
+  });
+
+  $('btnConfirmarNao').addEventListener('click', function () {
+    $('fundoConfirmar').classList.remove('aberto');
+    linhaParaExcluir = null;
+  });
   $('fundoConfirmar').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('aberto'); });
+  $('btnVoltarEdicao').addEventListener('click', function () {
+    $('fundoConfirmar').classList.remove('aberto');
+    var p = dados.find(function (x) { return x.linha == linhaParaExcluir; });
+    linhaParaExcluir = null;
+    if (p) abrirForm(p);
+  });
   $('btnConfirmarSim').addEventListener('click', function () {
     $('fundoConfirmar').classList.remove('aberto');
     if (linhaParaExcluir) chamarServidor('excluirProcesso', [Number(linhaParaExcluir)], 'Processo excluído.');

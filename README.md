@@ -7,7 +7,9 @@ Web app em tema escuro para acompanhar processos, substituindo a planilha `Contr
 - **Dashboard com resumo**: cards com total de processos, contagem por status, prazos vencidos e prazos que vencem nos próximos 2 dias. Clique num card de status para filtrar por ele.
 - **Filtros dinâmicos**: busca por texto (processo, descrição, observações), filtro por status e por período da data de mudança de status. Tudo instantâneo, sem recarregar.
 - **Alerta visual de prazos**: prazos vencidos em vermelho, prazos nos próximos 2 dias em amarelo.
-- **Edição direta no app**: criar, editar e excluir processos, além de troca rápida de status direto na tabela (a data de mudança é atualizada automaticamente).
+- **Edição direta no app**: criar, editar e excluir processos (com confirmação), além de troca rápida de status direto na tabela (a data de mudança é atualizada automaticamente).
+- **Links clicáveis**: informe o link do SEI e o número do processo vira um link que abre o processo direto no SEI. Há também uma coluna **Links relacionados** (um link por linha, opcionalmente `Rótulo | https://endereço`) — qualquer endereço é reconhecido como link clicável, não como texto.
+- **Arquivamento**: arquive processos concluídos/inativos; eles saem da lista principal e ficam na aba **Arquivados**, de onde podem ser desarquivados.
 - **Ordenação**: clique no cabeçalho de qualquer coluna para ordenar.
 - **Dados já importados**: os 15 processos da planilha original estão embutidos em `Code.gs` (`DADOS_INICIAIS`) e são gravados na planilha Google no primeiro acesso.
 
@@ -39,7 +41,7 @@ Usando a extensão **Google Apps Script GitHub Assistant** (Chrome):
 
 ## Usando uma planilha existente (opcional)
 
-Se preferir apontar para uma planilha Google já existente (com a aba `Processos` e as colunas Processo, Descrição, Status, Data de mudança de Status, Prazo, Obs):
+Se preferir apontar para uma planilha Google já existente (com a aba `Processos`): o app usa as colunas Processo, Link, Descrição, Status, Data de mudança de Status, Prazo, Links relacionados, Obs e Arquivado. Qualquer coluna que falte é criada automaticamente no primeiro acesso, sem apagar os dados existentes.
 
 1. Em **Configurações do projeto > Propriedades do script**, crie a propriedade `SPREADSHEET_ID` com o ID da planilha.
 2. O app passa a ler e gravar nela.
@@ -47,5 +49,5 @@ Se preferir apontar para uma planilha Google já existente (com a aba `Processos
 ## Observações
 
 - A planilha de dados pode continuar sendo aberta e editada normalmente (link "Abrir planilha ↗" no topo do app).
-- Novos status digitados no formulário passam a aparecer automaticamente nos filtros e nos cards.
-- O status **Concluído** já é oferecido como opção; processos concluídos não geram alerta de prazo.
+- Os quatro status — **Em Andamento**, **Concluído**, **Consulta** e **Não iniciado** — são sempre oferecidos no formulário e nos filtros; status já existentes na planilha também aparecem.
+- Processos concluídos não geram alerta de prazo.
