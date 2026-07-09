@@ -29,7 +29,7 @@
     font-size: 14px;
     line-height: 1.45;
   }
-  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 48px; }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 24px 20px 48px; }
 
   /* ---------- Topo ---------- */
   .topo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -84,21 +84,38 @@
   .painel { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
   .painel-topo { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--hairline); color: var(--ink-2); font-size: 13px; }
   .rolagem { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; min-width: 900px; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; table-layout: fixed; }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
   tbody tr:last-child td { border-bottom: none; }
   th {
     color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .04em; cursor: pointer; user-select: none; white-space: nowrap;
+    letter-spacing: .04em; cursor: pointer; user-select: none; line-height: 1.3;
     position: sticky; top: 0; background: var(--surface); z-index: 1;
   }
   th:hover { color: var(--ink-2); }
   tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  td .proc { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  td .desc { color: var(--ink); }
-  td .obs { color: var(--ink-2); font-size: 13px; }
+  td .proc { font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  td .desc { color: var(--ink); overflow-wrap: anywhere; }
+  td .obs { color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; }
   .vazio { padding: 40px; text-align: center; color: var(--muted); }
+
+  /* Larguras das colunas (table-layout: fixed).
+     Descrição e Obs ficam sem largura fixa e dividem o espaço restante. */
+  col.c-processo { width: 150px; }
+  col.c-status { width: 172px; }
+  col.c-dataStatus { width: 112px; }
+  col.c-prazo { width: 178px; }
+  col.c-linksRelacionados { width: 150px; }
+  col.c-acoes { width: 122px; }
+
+  /* Coluna de ações fixada à direita — sempre visível, sem rolar */
+  th.acoes-col, td.acoes-col {
+    position: sticky; right: 0; background: var(--surface); z-index: 2;
+    box-shadow: -10px 0 10px -8px rgba(0, 0, 0, 0.55); white-space: nowrap;
+  }
+  th.acoes-col { z-index: 3; }
+  tbody tr:hover td.acoes-col { background: #1f1f1e; }
 
   /* ---------- Links ---------- */
   a.link-ext { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(57, 135, 229, 0.35); }
@@ -106,8 +123,8 @@
   td .proc a.link-ext { color: var(--accent); }
   .links-rel { display: flex; flex-direction: column; gap: 4px; }
   .links-rel a.link-ext {
-    display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; font-size: 13px; vertical-align: bottom;
+    display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-size: 13px;
   }
   .links-sem { color: var(--muted); }
 
@@ -128,17 +145,19 @@
   select.badge {
     appearance: none; -webkit-appearance: none; border-radius: 999px; font-weight: 600;
     font-size: 12.5px; padding: 3px 22px 3px 12px; min-height: 0; cursor: pointer;
+    max-width: 100%;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6'><path d='M0 0l4 6 4-6z' fill='%23898781'/></svg>");
     background-repeat: no-repeat; background-position: right 8px center;
   }
 
-  .prazo-badge { display: inline-block; border-radius: 6px; padding: 2px 8px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .prazo-badge { display: inline-block; max-width: 100%; border-radius: 6px; padding: 2px 8px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .prazo-vencido { background: rgba(208, 59, 59, 0.18); color: #ef8a8a; }
   .prazo-proximo { background: rgba(250, 178, 25, 0.16); color: var(--warning); }
   .prazo-normal { color: var(--ink-2); }
   .prazo-sem { color: var(--muted); }
 
-  .acao { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 4px 6px; border-radius: 6px; }
+  .acao { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 4px 5px; border-radius: 6px; }
+  td.acoes-col { padding-left: 8px; padding-right: 8px; }
   .acao:hover { color: var(--ink); background: var(--surface-3); }
   .acao.excluir:hover { color: #ef8a8a; background: rgba(208, 59, 59, 0.15); }
 
@@ -233,6 +252,16 @@
     <div class="painel-topo"><span id="contagem"></span></div>
     <div class="rolagem">
       <table>
+        <colgroup>
+          <col class="c-processo">
+          <col class="c-descricao">
+          <col class="c-status">
+          <col class="c-dataStatus">
+          <col class="c-prazo">
+          <col class="c-obs">
+          <col class="c-linksRelacionados">
+          <col class="c-acoes">
+        </colgroup>
         <thead>
           <tr>
             <th data-col="processo">Processo</th>
@@ -242,7 +271,7 @@
             <th data-col="prazo">Prazo</th>
             <th data-col="obs">Obs</th>
             <th data-col="linksRelacionados">Links relacionados</th>
-            <th></th>
+            <th class="acoes-col"></th>
           </tr>
         </thead>
         <tbody id="corpoTabela"></tbody>
@@ -616,7 +645,7 @@
         '<td>' + celulaPrazo(p) + '</td>' +
         '<td><span class="obs">' + escapar(p.obs) + '</span></td>' +
         '<td>' + celulaLinks(p) + '</td>' +
-        '<td style="white-space:nowrap">' +
+        '<td class="acoes-col">' +
           '<button class="acao" title="Editar" data-editar="' + p.linha + '">✏️</button>' +
           botaoArquivo +
           '<button class="acao excluir" title="Excluir" data-excluir="' + p.linha + '">🗑️</button>' +
