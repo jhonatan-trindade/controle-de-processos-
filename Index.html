@@ -198,9 +198,51 @@
   .girar { width: 18px; height: 18px; border: 2px solid var(--hairline); border-top-color: var(--accent); border-radius: 50%; animation: girar .8s linear infinite; }
   @keyframes girar { to { transform: rotate(360deg); } }
 
+  /* ---------- Telas estreitas: tabela vira cartões ---------- */
+  @media (max-width: 720px) {
+    .wrap { padding: 16px 12px 40px; }
+    .painel { border-radius: 12px; }
+    .painel-topo { padding: 10px 14px; }
+    .rolagem { overflow-x: visible; }
+    table { min-width: 0; width: 100%; table-layout: auto; }
+    table colgroup, thead { display: none; }
+    tbody, tr, td { display: block; width: auto; }
+    tbody { padding: 10px 12px; }
+    tr {
+      border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-2);
+      padding: 12px 14px; margin-bottom: 12px;
+    }
+    tbody tr:last-child td { border-bottom: 1px solid var(--hairline); }
+    td {
+      border: none; border-bottom: 1px solid var(--hairline);
+      padding: 8px 0; display: flex; flex-direction: column; gap: 4px;
+    }
+    tr td:last-child { border-bottom: none; padding-bottom: 0; }
+    tr td:first-child { padding-top: 0; }
+    td[data-rotulo]::before {
+      content: attr(data-rotulo);
+      color: var(--muted); font-size: 10.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+    }
+    /* Célula de ações: rótulo e botões lado a lado, coluna não mais fixa */
+    td.acoes-col {
+      position: static; box-shadow: none; background: none;
+      flex-direction: row; gap: 8px; padding-top: 12px;
+    }
+    td.acoes-col .acao { font-size: 20px; padding: 6px 10px; border: 1px solid var(--hairline); }
+    /* Elementos que não devem esticar/ficar recortados dentro do cartão */
+    select.badge { max-width: none; width: max-content; }
+    .prazo-badge { max-width: none; }
+    .links-rel a.link-ext { max-width: 100%; }
+    td .proc, td .desc, td .obs { overflow-wrap: anywhere; word-break: break-word; }
+    .vazio { padding: 28px 12px; }
+  }
+
   @media (max-width: 640px) {
     .modal .grade { grid-template-columns: 1fr; }
+    .topo { justify-content: space-between; }
     .topo .acoes { margin-left: 0; width: 100%; }
+    .abas { overflow-x: auto; }
   }
 </style>
 </head>
@@ -638,13 +680,13 @@
         ? '<button class="acao" title="Desarquivar" data-desarquivar="' + p.linha + '">📤</button>'
         : '<button class="acao" title="Arquivar" data-arquivar="' + p.linha + '">📥</button>';
       return '<tr>' +
-        '<td>' + celulaProcesso(p) + '</td>' +
-        '<td><span class="desc">' + escapar(p.descricao) + '</span></td>' +
-        '<td>' + seletorStatus(p) + '</td>' +
-        '<td class="num">' + escapar(formatarData(p.dataStatus)) + '</td>' +
-        '<td>' + celulaPrazo(p) + '</td>' +
-        '<td><span class="obs">' + escapar(p.obs) + '</span></td>' +
-        '<td>' + celulaLinks(p) + '</td>' +
+        '<td data-rotulo="Processo">' + celulaProcesso(p) + '</td>' +
+        '<td data-rotulo="Descrição"><span class="desc">' + escapar(p.descricao) + '</span></td>' +
+        '<td data-rotulo="Status">' + seletorStatus(p) + '</td>' +
+        '<td class="num" data-rotulo="Mudança de status">' + escapar(formatarData(p.dataStatus)) + '</td>' +
+        '<td data-rotulo="Prazo">' + celulaPrazo(p) + '</td>' +
+        '<td data-rotulo="Obs"><span class="obs">' + escapar(p.obs) + '</span></td>' +
+        '<td data-rotulo="Links relacionados">' + celulaLinks(p) + '</td>' +
         '<td class="acoes-col">' +
           '<button class="acao" title="Editar" data-editar="' + p.linha + '">✏️</button>' +
           botaoArquivo +
