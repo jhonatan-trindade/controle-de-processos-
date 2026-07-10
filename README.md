@@ -43,8 +43,20 @@ Usando a extensão **Google Apps Script GitHub Assistant** (Chrome):
 
 Se preferir apontar para uma planilha Google já existente (com a aba `Processos`): o app usa as colunas Processo, Link, Descrição, Status, Data de mudança de Status, Prazo, Links relacionados, Obs e Arquivado. Qualquer coluna que falte é criada automaticamente no primeiro acesso, sem apagar os dados existentes.
 
-1. Em **Configurações do projeto > Propriedades do script**, crie a propriedade `SPREADSHEET_ID` com o ID da planilha.
-2. O app passa a ler e gravar nela.
+Há duas formas de fazer o app usar essa planilha:
+
+**A) Script vinculado à planilha (recomendado — código e dados no mesmo lugar)**
+
+1. Abra a planilha desejada e vá em **Extensões > Apps Script**. Isso cria um projeto de script "vinculado" (bound) a ela.
+2. Traga `Code.gs`, `Index.html` e `appsscript.json` deste repositório para esse projeto (copiando o conteúdo ou via extensão GitHub Assistant, como descrito acima).
+3. Não é preciso configurar nada mais: o app detecta automaticamente que está vinculado a essa planilha e passa a ler/gravar nela, sem criar uma planilha nova.
+4. Publique o web app a partir desse mesmo projeto (**Implantar > Nova implantação**). Assim, ao abrir a planilha, o menu **Extensões > Apps Script** sempre leva direto ao código que está de fato em uso.
+
+**B) Propriedade SPREADSHEET_ID (script separado da planilha)**
+
+1. Copie o ID da planilha pela URL (`.../spreadsheets/d/`**`ID`**`/edit`).
+2. No editor do Apps Script (projeto standalone), vá em **Configurações do projeto > Propriedades do script** e crie a propriedade `SPREADSHEET_ID` com esse valor.
+3. O app passa a ler e gravar nela.
 
 ## Observações
 

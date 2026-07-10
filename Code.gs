@@ -62,7 +62,15 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** Retorna a planilha de dados, criando e semeando na primeira execução. */
+/**
+ * Retorna a planilha de dados, criando e semeando na primeira execução.
+ * Ordem de resolução:
+ *   1) SPREADSHEET_ID salvo nas propriedades do script (planilha externa);
+ *   2) planilha à qual este script está vinculado (script "bound" criado via
+ *      Extensões > Apps Script dentro da própria planilha) — evita criar uma
+ *      planilha nova quando o código já mora junto dos dados;
+ *   3) cria uma planilha nova (uso como script standalone, primeiro acesso).
+ */
 function obterPlanilha_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('SPREADSHEET_ID');
@@ -70,8 +78,13 @@ function obterPlanilha_() {
     try {
       return SpreadsheetApp.openById(id);
     } catch (e) {
-      // ID inválido ou planilha excluída: cria uma nova abaixo.
+      // ID inválido ou planilha excluída: tenta os fallbacks abaixo.
     }
+  }
+  var vinculada = SpreadsheetApp.getActiveSpreadsheet();
+  if (vinculada) {
+    props.setProperty('SPREADSHEET_ID', vinculada.getId());
+    return vinculada;
   }
   var ss = SpreadsheetApp.create('Controle de Processos');
   var aba = ss.getSheets()[0].setName(NOME_ABA);
