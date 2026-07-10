@@ -198,8 +198,13 @@
   .girar { width: 18px; height: 18px; border: 2px solid var(--hairline); border-top-color: var(--accent); border-radius: 50%; animation: girar .8s linear infinite; }
   @keyframes girar { to { transform: rotate(360deg); } }
 
-  /* ---------- Telas estreitas: tabela vira cartões ---------- */
-  @media (max-width: 720px) {
+  /* ---------- Telas sem espaço para a tabela cheia: vira cartões ----------
+     A tabela tem 6 colunas de largura fixa (~884px) + Descrição/Obs, que
+     precisam de espaço extra para não serem espremidas. Abaixo de ~1300px
+     (bem menor que uma janela cheia, cobre janelas "meio de tela" também)
+     usamos cartões em vez de arriscar colunas de texto quebradas letra a
+     letra. */
+  @media (max-width: 1300px) {
     .wrap { padding: 16px 12px 40px; }
     .painel { border-radius: 12px; }
     .painel-topo { padding: 10px 14px; }
